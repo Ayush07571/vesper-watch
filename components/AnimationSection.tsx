@@ -5,6 +5,9 @@ import Link from 'next/link';
 import Loader from './Loader';
 
 const frameCount = 244;
+const PRIORITY_COUNT = 40; // Load first 40 frames to show the site instantly
+const BATCH_SIZE = 5; // Fetch in small parallel batches
+
 const currentFrame = (index: number) => `/images/ezgif-frame-${index.toString().padStart(3, '0')}.webp`;
 
 const contentBlocks = [
@@ -18,41 +21,54 @@ const contentBlocks = [
 export default function AnimationSection() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const imagesRef = useRef<ImageBitmap[]>([]);
+  const stickyRef = useRef<HTMLDivElement>(null);
+  const imagesRef = useRef<(ImageBitmap | null)[]>(new Array(frameCount).fill(null));
   const lastFrameRef = useRef<number>(-1);
-  const animationFrameIdRef = useRef<number>();
+  const rafIdRef = useRef<number>();
   
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  // Preload Images
   useEffect(() => {
     let isMounted = true;
+
+    const fetchFrame = async (i: number) => {
+      try {
+        const res = await fetch(currentFrame(i));
+        if (!res.ok) return null;
+        const blob = await res.blob();
+        return await createImageBitmap(blob, { resizeQuality: 'high' });
+      } catch { return null; }
+    };
+
     const preload = async () => {
-      let done = 0;
-      const bitmaps: ImageBitmap[] = [];
-      
-      for (let i = 1; i <= frameCount; i++) {
+      // Phase 1: PRIORITY LOAD
+      // We load the first chunk sequentially to show the site ASAP
+      for (let i = 1; i <= PRIORITY_COUNT; i++) {
         if (!isMounted) return;
-        try {
-          const res = await fetch(currentFrame(i));
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const blob = await res.blob();
-          const bm = await createImageBitmap(blob, { resizeQuality: 'high' });
-          bitmaps.push(bm);
-          done++;
-          if (i % 10 === 0 || i === frameCount) {
-            setProgress((done / frameCount) * 100);
-          }
-        } catch (err) {
-          console.error(`Failed to load frame ${i}:`, err);
-        }
+        const bm = await fetchFrame(i);
+        if (bm) imagesRef.current[i - 1] = bm;
+        setProgress((i / PRIORITY_COUNT) * 100);
       }
 
       if (isMounted) {
-        imagesRef.current = bitmaps;
         setLoading(false);
+        renderFrame(0);
+      }
+
+      // Phase 2: BACKGROUND LOAD (In Batches)
+      // We load the rest in small parallel batches to speed it up without freezing the UI
+      for (let i = PRIORITY_COUNT + 1; i <= frameCount; i += BATCH_SIZE) {
+        if (!isMounted) return;
+        const batch = [];
+        for (let j = 0; j < BATCH_SIZE && (i + j) <= frameCount; j++) {
+          batch.push((async () => {
+            const bm = await fetchFrame(i + j);
+            if (bm) imagesRef.current[i + j - 1] = bm;
+          })());
+        }
+        await Promise.all(batch);
       }
     };
 
@@ -63,18 +79,25 @@ export default function AnimationSection() {
   const renderFrame = (index: number) => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx || imagesRef.current.length === 0) return;
+    if (!canvas || !ctx) return;
 
-    const frameIndex = Math.max(1, Math.min(imagesRef.current.length, imagesRef.current.length - Math.floor(index)));
-    const bitmap = imagesRef.current[frameIndex - 1];
+    const frameIdx = Math.max(0, Math.min(frameCount - 1, Math.floor(index)));
+    let bitmap = imagesRef.current[frameIdx];
     
+    // Nearest neighbor fallback for background loading
+    if (!bitmap) {
+      for (let o = 1; o < 50; o++) {
+        if (imagesRef.current[frameIdx - o]) { bitmap = imagesRef.current[frameIdx - o]; break; }
+        if (imagesRef.current[frameIdx + o]) { bitmap = imagesRef.current[frameIdx + o]; break; }
+      }
+    }
+
     if (!bitmap) return;
 
     const dpr = window.devicePixelRatio || 1;
     const canvasLogicalWidth = canvas.width / dpr;
     const canvasLogicalHeight = canvas.height / dpr;
 
-    // Background Removal
     const offscreen = new OffscreenCanvas(canvas.width, canvas.height);
     const offCtx = offscreen.getContext('2d');
     if (!offCtx) return;
@@ -102,111 +125,32 @@ export default function AnimationSection() {
 
     const imageData = offCtx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
-    const threshold = 42; // Slightly higher to be safe
 
     for (let i = 0; i < data.length; i += 4) {
-      const r = data[i], g = data[i+1], b = data[i+2];
-      const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-      if (luminance < threshold) {
-        data[i + 3] = 0;
-      } else if (luminance < threshold + 15) {
-        data[i + 3] = Math.round(((luminance - threshold) / 15) * 255);
-      }
+      const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      if (avg < 42) data[i + 3] = 0;
     }
 
-    offCtx.putImageData(imageData, 0, 0);
-
-    ctx.clearRect(0, 0, canvasLogicalWidth, canvasLogicalHeight);
-    ctx.drawImage(offscreen, 0, 0, canvas.width, canvas.height, 0, 0, canvasLogicalWidth, canvasLogicalHeight);
-    
-    ctx.globalAlpha = 0.35;
-    ctx.globalCompositeOperation = 'overlay';
-    ctx.drawImage(offscreen, 0, 0, canvas.width, canvas.height, 0, 0, canvasLogicalWidth, canvasLogicalHeight);
-    
-    ctx.globalAlpha = 1.0;
-    ctx.globalCompositeOperation = 'source-over';
-  };
-
-  const updateContent = (progress: number) => {
-    const fadeWindow = 0.05;
-
-    contentBlocks.forEach(block => {
-      const el = document.getElementById(block.id);
-      if (!el) return;
-
-      let opacity = 0;
-      let translateY = 20; 
-
-      if (progress >= block.start && progress <= block.end) {
-        if (progress < block.start + fadeWindow) {
-          opacity = (progress - block.start) / fadeWindow;
-        } else if (progress > block.end - fadeWindow) {
-          opacity = (block.end - progress) / fadeWindow;
-        } else {
-          opacity = 1;
-        }
-        translateY = (1 - opacity) * 20;
-      }
-
-      el.style.opacity = opacity.toString();
-      el.style.transform = `translateY(${translateY}px)`;
-      el.style.visibility = opacity === 0 ? 'hidden' : 'visible';
-
-      // Synchronize -left and -right sub-elements if they exist
-      const leftPart = document.getElementById(`${block.id}-left`);
-      const rightPart = document.getElementById(`${block.id}-right`);
-      if (leftPart) {
-        leftPart.style.opacity = opacity.toString();
-        leftPart.style.transform = `translateY(${translateY}px)`;
-        leftPart.style.visibility = opacity === 0 ? 'hidden' : 'visible';
-      }
-      if (rightPart) {
-        rightPart.style.opacity = opacity.toString();
-        rightPart.style.transform = `translateY(${translateY}px)`;
-        rightPart.style.visibility = opacity === 0 ? 'hidden' : 'visible';
-      }
-    });
-
-    const listItems = document.querySelectorAll('.component-list li');
-    if (listItems.length > 0 && progress >= 0.45 && progress <= 0.65) {
-      const blockProgress = (progress - 0.45) / (0.65 - 0.45); 
-      listItems.forEach((item, i) => {
-        const itemEl = item as HTMLElement;
-        const itemThreshold = i / listItems.length;
-        const itemOpacity = Math.max(0, Math.min(1, (blockProgress - itemThreshold) / 0.15));
-        itemEl.style.opacity = itemOpacity.toString();
-      });
-    }
-
-    const indicator = document.getElementById('scroll-indicator');
-    if (indicator) indicator.style.opacity = progress > 0.03 ? '0' : '1';
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.putImageData(imageData, 0, 0);
   };
 
   const resize = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const sticky = stickyRef.current;
+    const container = containerRef.current;
+    if (!canvas || !sticky || !container) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const parent = canvas.parentElement;
-    if (!parent) return;
-
-    const w = parent.clientWidth;
-    const h = parent.clientHeight;
-
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
+    const rect = sticky.getBoundingClientRect();
     
-    canvas.style.width = `${w}px`;
-    canvas.style.height = `${h}px`;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${rect.height}px`;
 
-    const ctx = canvas.getContext('2d');
-    if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    
-    const section = containerRef.current;
-    if (section) {
-      const scrollFraction = window.scrollY / (section.offsetHeight - window.innerHeight);
-      renderFrame(scrollFraction * (imagesRef.current.length - 1));
-    }
+    const scrollFraction = window.scrollY / (container.offsetHeight - window.innerHeight);
+    renderFrame(Math.max(0, Math.min(1, scrollFraction)) * (frameCount - 1));
   };
 
   useEffect(() => {
@@ -223,77 +167,80 @@ export default function AnimationSection() {
       const clampedProgress = Math.max(0, Math.min(1, scrollFraction));
       setScrollProgress(clampedProgress);
 
-      const frameIndex = clampedProgress * (imagesRef.current.length - 1);
+      const frameIndex = clampedProgress * (frameCount - 1);
       if (Math.floor(frameIndex) !== lastFrameRef.current) {
         renderFrame(frameIndex);
         lastFrameRef.current = Math.floor(frameIndex);
       }
       
-      updateContent(clampedProgress);
+      contentBlocks.forEach(block => {
+        const el = document.getElementById(block.id);
+        const rel = document.getElementById(`${block.id}-right`);
+        if (el) {
+          if (clampedProgress >= block.start && clampedProgress <= block.end) {
+            const bp = (clampedProgress - block.start) / (block.end - block.start);
+            const opacity = Math.sin(bp * Math.PI);
+            el.style.opacity = opacity.toString();
+            el.style.visibility = 'visible';
+            el.style.transform = `translateY(${(1-opacity)*25}px)`;
+            if (rel) {
+              rel.style.opacity = opacity.toString();
+              rel.style.visibility = 'visible';
+              rel.style.transform = `translateY(${(1-opacity)*25}px)`;
+            }
+          } else {
+            el.style.opacity = '0';
+            el.style.visibility = 'hidden';
+            el.style.transform = `translateY(40px)`;
+            if (rel) { rel.style.opacity = '0'; rel.style.visibility = 'hidden'; rel.style.transform = `translateY(40px)`; }
+          }
+        }
+      });
 
-      animationFrameIdRef.current = requestAnimationFrame(update);
+      rafIdRef.current = requestAnimationFrame(update);
     };
 
-    animationFrameIdRef.current = requestAnimationFrame(update);
-
+    rafIdRef.current = requestAnimationFrame(update);
     return () => {
       window.removeEventListener('resize', resize);
-      if (animationFrameIdRef.current) cancelAnimationFrame(animationFrameIdRef.current);
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
     };
   }, [loading]);
 
   return (
-    <>
+    <section ref={containerRef} className="relative h-[550vh] bg-[#080705]">
       <Loader progress={progress} isVisible={loading} />
       
-      <section ref={containerRef} id="animation-section" className="h-[500vh] relative bg-[#080705]">
-        <div className="sticky top-0 h-screen w-full grid grid-cols-[1fr_2fr_1fr] px-[6vw] items-center">
+      <div ref={stickyRef} className="sticky top-0 h-screen w-full overflow-hidden">
+        <div className="h-full w-full grid grid-cols-[1.2fr_2fr_1.2fr] px-[6vw]">
           
-          {/* Left Gutter */}
-          <div className="relative h-full flex flex-col justify-center pointer-events-none z-20">
-            {/* Main Block 1 Content */}
+          <div className="relative h-full flex flex-col justify-center text-left pointer-events-none z-20">
             <div id="block-1" className="content-panel opacity-0">
-               <span className="label-text mb-4 block">The First Edition</span>
-               <h1 className="title-serif">THE<br/>EQUINOX</h1>
-               <p className="caption-text">BY VESPER</p>
+               <span className="label-text mb-4 block">Collection 2026</span>
+               <h1 className="title-serif">VESPER</h1>
+               <p className="caption-text">THE EQUINOX EDITION</p>
             </div>
-
             <div id="block-2" className="content-panel opacity-0">
-               <span className="label-text mb-4 block text-accent">Philosophy</span>
-               <h2 className="subtitle-serif">Mechanical<br/>Purity.</h2>
-               <p className="paragraph-text mt-4">Architecture of time revealed in its purest form. Each component hand-finished.</p>
+               <span className="label-text mb-4 block">The Caliber</span>
+               <h2 className="subtitle-serif">BORN<br/>SKELETAL.</h2>
+               <p className="description-text">Every bridge, every gear, every spring is stripped to its absolute essence. Perfection through elimination.</p>
             </div>
-
             <div id="block-3" className="content-panel opacity-0">
-               <ul className="component-list">
-                 <li><span className="item-title">Sapphire</span><span className="item-sub">Double-domed crystal</span></li>
-                 <li><span className="item-title">Sunburst</span><span className="item-sub">Charcoal finish dial</span></li>
-                 <li><span className="item-title">Titanium</span><span className="item-sub">Grade 5 polished case</span></li>
-               </ul>
+               <span className="label-text mb-4 block">Materials</span>
+               <h2 className="subtitle-serif">GRADE 5<br/>TITANIUM.</h2>
+               <p className="description-text">Lighter than steel. Stronger than time. A case crafted for the eternal pursuit of accuracy.</p>
             </div>
           </div>
 
-          {/* Center Gutter - Watch */}
-          <div className="relative h-full w-full flex items-center justify-center z-10 overflow-hidden">
-            <canvas 
-              ref={canvasRef} 
-              className="max-h-[90vh] w-auto pointer-events-none"
-              style={{ 
-                background: 'transparent',
-                imageRendering: '-webkit-optimize-contrast'
-              }}
-            />
+          <div className="relative h-full flex items-center justify-center">
+            <canvas ref={canvasRef} className="max-w-none" style={{ background: 'transparent' }} />
           </div>
 
-          {/* Right Gutter */}
           <div className="relative h-full flex flex-col justify-center text-right pointer-events-none z-20">
-            {/* Balanced Block 1 Right Panel */}
             <div id="block-1-right" className="content-panel opacity-0">
-               <h1 className="title-serif">244</h1>
+               <h1 className="title-serif text-white/30">244</h1>
                <p className="caption-text">LIMITED EDITION PIECES</p>
             </div>
-
-            {/* Mirroring blocks for the right side or unique content */}
             <div id="block-4" className="content-panel opacity-0">
                <span className="label-text mb-4 block">Technical</span>
                <div className="spec-rows">
@@ -302,125 +249,34 @@ export default function AnimationSection() {
                   <div className="spec-item"><span className="spec-label">Crystal</span><span className="spec-value">Sapphire AR</span></div>
                </div>
             </div>
-
             <div id="block-5" className="content-panel opacity-0">
                <span className="label-text mb-4 block">Availability</span>
                <h2 className="subtitle-serif">RESERVE<br/>EDITION.</h2>
                <div className="mt-8">
-                  <Link href="/contact" className="btn pointer-events-auto">
-                    Secure Timepiece
-                  </Link>
+                  <Link href="/contact" className="btn pointer-events-auto">Secure Timepiece</Link>
                </div>
             </div>
           </div>
-
-          {/* Scroll Indicator */}
-          <div id="scroll-indicator" className="absolute bottom-[6vh] left-1/2 -translate-x-1/2 flex flex-col items-center gap-4 transition-opacity duration-500 z-[100]">
-            <span className="label-text">Explore</span>
-            <div className="w-[1px] h-[60px] bg-gradient-to-b from-[#c8622a] to-transparent" />
-          </div>
         </div>
+        
+        <div className="absolute top-0 left-0 w-full h-[1px] bg-white/5 z-[1000]">
+          <div className="h-full bg-[#c8622a] transition-all duration-300" style={{ width: `${scrollProgress * 100}%` }} />
+        </div>
+      </div>
 
-        <style jsx>{`
-          .content-panel {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 100%;
-          }
-
-          .title-serif {
-            font-family: var(--font-serif);
-            font-size: clamp(2rem, 4vw, 4.5rem);
-            letter-spacing: 0.25em;
-            line-height: 1.1;
-            margin-bottom: 1rem;
-            white-space: nowrap;
-          }
-
-          .subtitle-serif {
-            font-family: var(--font-serif);
-            font-size: clamp(1.2rem, 2vw, 2.5rem);
-            letter-spacing: 0.15em;
-            line-height: 1.2;
-            text-transform: uppercase;
-          }
-
-          .caption-text {
-            font-size: 0.7rem;
-            letter-spacing: 0.35em;
-            color: var(--accent-color);
-            font-weight: 300;
-          }
-
-          .paragraph-text {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            line-height: 1.8;
-          }
-
-          .component-list {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
-          }
-
-          .item-title {
-            font-family: var(--font-serif);
-            font-size: 0.75rem;
-            letter-spacing: 0.2em;
-            color: var(--accent-color);
-            text-transform: uppercase;
-            display: block;
-            margin-bottom: 0.2rem;
-          }
-
-          .item-sub {
-            font-size: 0.65rem;
-            letter-spacing: 0.1em;
-            color: var(--text-muted);
-          }
-
-          .spec-rows {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-          }
-
-          .spec-item {
-            display: flex;
-            flex-direction: column;
-            gap: 0.4rem;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            padding-bottom: 1rem;
-          }
-
-          .spec-label {
-            font-size: 0.6rem;
-            letter-spacing: 0.3em;
-            text-transform: uppercase;
-            color: var(--accent-color);
-          }
-
-          .spec-value {
-            font-size: 0.85rem;
-            font-weight: 300;
-          }
-
-          @media (max-width: 1024px) {
-            .title-serif { font-size: 2.5rem; }
-          }
-
-          @media (max-width: 768px) {
-            section { height: auto !important; }
-            .sticky { position: relative !important; height: auto !important; }
-            .grid { display: block; padding: 4rem 1.5rem; }
-            .content-panel { position: relative; top: 0; transform: none; margin-bottom: 4rem; opacity: 1 !important; visibility: visible !important; }
-            canvas { height: 50vh !important; margin: 2rem 0; }
-          }
-        `}</style>
-      </section>
-    </>
+      <style jsx>{`
+        .content-panel { position: absolute; width: 100%; transition: all 1s ease; }
+        .title-serif { font-size: 5rem; line-height: 0.9; margin-bottom: 1rem; color: white; }
+        .subtitle-serif { font-size: 3.5rem; line-height: 1; margin-bottom: 1.5rem; color: white; }
+        .label-text { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.4em; color: #c8622a; }
+        .caption-text { font-size: 0.7rem; letter-spacing: 0.5em; color: #c8622a; text-transform: uppercase; }
+        .description-text { font-size: 1rem; color: #8a8070; max-width: 350px; line-height: 1.6; font-weight: 300; }
+        .spec-rows { display: flex; flex-direction: column; gap: 1.5rem; }
+        .spec-item { display: flex; flex-direction: column; gap: 0.2rem; }
+        .spec-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.2em; color: #c8622a; }
+        .spec-value { font-size: 1.2rem; color: white; font-family: var(--font-serif); text-transform: uppercase; letter-spacing: 0.1em; }
+        @media (max-width: 1200px) { .title-serif { font-size: 3.5rem; } .subtitle-serif { font-size: 2.5rem; } }
+      `}</style>
+    </section>
   );
 }
