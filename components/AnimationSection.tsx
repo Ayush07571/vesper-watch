@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Loader from './Loader';
 
 const frameCount = 244;
-const currentFrame = (index: number) => `/images/ezgif-frame-${index.toString().padStart(3, '0')}.png`;
+const currentFrame = (index: number) => `/images/ezgif-frame-${index.toString().padStart(3, '0')}.webp`;
 
 const contentBlocks = [
   { id: 'block-1', start: 0,    end: 0.18 },
