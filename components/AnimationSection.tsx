@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Loader from './Loader';
 
 const frameCount = 244;
-const PRIORITY_LIMIT = 60; 
+const PRIORITY_LIMIT = 120; 
 const currentFrame = (index: number) => `/images/ezgif-frame-${index.toString().padStart(3, '0')}.webp`;
 
 const contentBlocks = [
@@ -39,20 +39,31 @@ export default function AnimationSection() {
     };
 
     const preload = async () => {
+      // 1. Priority Load (First 120 frames)
       for (let i = 1; i <= PRIORITY_LIMIT; i++) {
         if (!isMounted) return;
         const bm = await fetchImage(i);
         if (bm) imagesRef.current[i - 1] = bm;
         setProgress((i / PRIORITY_LIMIT) * 100);
       }
+      
       if (isMounted) {
         setLoading(false);
         renderFrame(0);
       }
-      for (let i = PRIORITY_LIMIT + 1; i <= frameCount; i++) {
+
+      // 2. Batch Background Load (Remaining frames in parallel groups of 10)
+      const batchSize = 10;
+      for (let i = PRIORITY_LIMIT + 1; i <= frameCount; i += batchSize) {
         if (!isMounted) return;
-        const bm = await fetchImage(i);
-        if (bm) imagesRef.current[i - 1] = bm;
+        const batch = [];
+        for (let j = 0; j < batchSize && (i + j) <= frameCount; j++) {
+          batch.push(fetchImage(i + j));
+        }
+        const results = await Promise.all(batch);
+        results.forEach((bm, idx) => {
+          if (bm) imagesRef.current[i + idx - 1] = bm;
+        });
       }
     };
     preload();
