@@ -21,7 +21,7 @@ export default function FinalCTA() {
 
       <div className="relative z-10">
         <span className="label-text mb-6 inline-block">Join the Waitlist</span>
-        <h2 className="text-4xl md:text-6xl mb-8 uppercase font-serif tracking-[0.4em] leading-tight">
+        <h2 className="text-3xl md:text-6xl mb-8 uppercase font-serif tracking-[0.2em] md:tracking-[0.4em] text-indent-[0.2em] md:text-indent-[0.4em] leading-tight">
           Limited to 244 Pieces<br/>Worldwide.
         </h2>
         <p className="mb-12 text-[#8a8070] font-light text-lg tracking-[0.1em]">

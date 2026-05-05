@@ -20,6 +20,7 @@ export default function AnimationSection() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const stickyRef = useRef<HTMLDivElement>(null);
+  const watchContainerRef = useRef<HTMLDivElement>(null);
   const imagesRef = useRef<(ImageBitmap | null)[]>(new Array(frameCount).fill(null));
   const lastFrameRef = useRef<number>(-1);
   const rafIdRef = useRef<number>();
@@ -39,7 +40,6 @@ export default function AnimationSection() {
     };
 
     const preload = async () => {
-      // 1. Priority Load (First 120 frames)
       for (let i = 1; i <= PRIORITY_LIMIT; i++) {
         if (!isMounted) return;
         const bm = await fetchImage(i);
@@ -52,7 +52,6 @@ export default function AnimationSection() {
         renderFrame(0);
       }
 
-      // 2. Batch Background Load (Remaining frames in parallel groups of 10)
       const batchSize = 10;
       for (let i = PRIORITY_LIMIT + 1; i <= frameCount; i += batchSize) {
         if (!isMounted) return;
@@ -96,8 +95,8 @@ export default function AnimationSection() {
     const canvasRatio = canvasLogicalWidth / canvasLogicalHeight;
     let drawWidth, drawHeight, offsetX, offsetY;
 
-    // CENTERED CONTAIN with 70% scale factor to prevent overlap
-    const SCALE = 0.7; 
+    const isMobile = window.innerWidth < 768;
+    const SCALE = isMobile ? 0.9 : 0.7; 
     
     if (canvasRatio > imgRatio) {
       drawHeight = canvasLogicalHeight * SCALE;
@@ -115,7 +114,7 @@ export default function AnimationSection() {
     offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     offCtx.drawImage(bitmap, offsetX, offsetY, drawWidth, drawHeight);
 
-    // REMOVE WATERMARK: Mask out the bottom-right corner area where "VEO" appears
+    // REMOVE WATERMARK
     offCtx.clearRect(offsetX + drawWidth * 0.8, offsetY + drawHeight * 0.85, drawWidth * 0.2, drawHeight * 0.15);
 
     const imageData = offCtx.getImageData(0, 0, canvas.width, canvas.height);
@@ -130,10 +129,10 @@ export default function AnimationSection() {
 
   const resize = () => {
     const canvas = canvasRef.current;
-    const sticky = stickyRef.current;
-    if (!canvas || !sticky) return;
+    const watchContainer = watchContainerRef.current;
+    if (!canvas || !watchContainer) return;
     const dpr = window.devicePixelRatio || 1;
-    const rect = sticky.getBoundingClientRect();
+    const rect = watchContainer.getBoundingClientRect();
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     canvas.style.width = `${rect.width}px`;
@@ -163,6 +162,8 @@ export default function AnimationSection() {
       contentBlocks.forEach(block => {
         const el = document.getElementById(block.id);
         const rel = document.getElementById(`${block.id}-right`);
+        const isMobile = window.innerWidth < 768;
+
         if (el) {
           if (clampedProgress >= block.start && clampedProgress <= block.end) {
             const bp = (clampedProgress - block.start) / (block.end - block.start);
@@ -171,11 +172,19 @@ export default function AnimationSection() {
             el.style.opacity = opacity.toString();
             el.style.visibility = 'visible';
             el.style.transform = `translateY(${(1-opacity)*25}px)`;
-            if (rel) { rel.style.opacity = opacity.toString(); rel.style.visibility = 'visible'; rel.style.transform = `translateY(${(1-opacity)*25}px)`; }
+            
+            if (rel && !isMobile) { 
+              rel.style.opacity = opacity.toString(); 
+              rel.style.visibility = 'visible'; 
+              rel.style.transform = `translateY(${(1-opacity)*25}px)`; 
+            } else if (rel) {
+              rel.style.opacity = '0';
+              rel.style.visibility = 'hidden';
+            }
           } else {
             if (block.id === 'block-5' && clampedProgress > 0.99) {
                el.style.opacity = '1'; el.style.visibility = 'visible'; el.style.transform = `translateY(0px)`;
-               if (rel) { rel.style.opacity = '1'; rel.style.visibility = 'visible'; rel.style.transform = `translateY(0px)`; }
+               if (rel && !isMobile) { rel.style.opacity = '1'; rel.style.visibility = 'visible'; rel.style.transform = `translateY(0px)`; }
             } else {
                el.style.opacity = '0'; el.style.visibility = 'hidden'; el.style.transform = `translateY(40px)`;
                if (rel) { rel.style.opacity = '0'; rel.style.visibility = 'hidden'; rel.style.transform = `translateY(40px)`; }
@@ -196,18 +205,22 @@ export default function AnimationSection() {
     <section ref={containerRef} className="relative h-[600vh] bg-[#080705]">
       <Loader progress={progress} isVisible={loading} />
       
-      <div ref={stickyRef} className="sticky top-0 h-screen w-full overflow-hidden">
+      <div ref={stickyRef} className="sticky top-0 h-screen w-full flex flex-col md:block overflow-hidden">
         
-        {/* LAYER 1: Balanced Watch Layer */}
-        <div className="absolute inset-0 flex items-center justify-center z-10">
+        {/* Watch Container */}
+        <div ref={watchContainerRef} className="watch-chamber">
           <canvas ref={canvasRef} className="watch-canvas" />
         </div>
 
-        {/* LAYER 2: Text Panels (Wider gutters to prevent overlap) */}
-        <div className="absolute inset-0 z-20 flex justify-between px-[6vw] pointer-events-none">
+        {/* Narrative Container */}
+        <div className="panels-container">
           
-          <div className="relative h-full w-[400px] flex flex-col justify-center text-left">
+          <div className="side-column left-align">
             <div id="block-1" className="content-panel opacity-0">
+               <div className="mobile-only mb-2">
+                  <span className="text-[#c8622a] font-serif text-2xl tracking-[0.3em]">244</span>
+                  <p className="text-[0.5rem] tracking-[0.2em] uppercase opacity-50">Pieces</p>
+               </div>
                <span className="label-text mb-4 block">Collection 2026</span>
                <h1 className="title-serif">VESPER</h1>
                <p className="caption-text">THE EQUINOX EDITION</p>
@@ -222,19 +235,12 @@ export default function AnimationSection() {
                <h2 className="subtitle-serif">GRADE 5<br/>TITANIUM.</h2>
                <p className="description-text">Lighter than steel. Stronger than time. A case crafted for the eternal pursuit of accuracy.</p>
             </div>
-          </div>
-
-          <div className="relative h-full w-[400px] flex flex-col justify-center text-right">
-            <div id="block-1-right" className="content-panel opacity-0">
-               <h1 className="title-serif text-white/30">244</h1>
-               <p className="caption-text">LIMITED EDITION PIECES</p>
-            </div>
-            <div id="block-4" className="content-panel opacity-0">
+            {/* MOBILE ONLY BLOCK IN LEFT COLUMN */}
+            <div id="block-4-mobile" className="content-panel opacity-0 mobile-only">
                <span className="label-text mb-4 block">Technical</span>
                <div className="spec-rows">
-                  <div className="spec-item"><span className="spec-label">Case</span><span className="spec-value">38mm Titanium</span></div>
+                  <div className="spec-item"><span className="spec-label">Case</span><span className="spec-value">38mm Ti</span></div>
                   <div className="spec-item"><span className="spec-label">Power</span><span className="spec-value">42hr Reserve</span></div>
-                  <div className="spec-item"><span className="spec-label">Crystal</span><span className="spec-value">Sapphire AR</span></div>
                </div>
             </div>
             <div id="block-5" className="content-panel opacity-0">
@@ -242,6 +248,21 @@ export default function AnimationSection() {
                <h2 className="subtitle-serif">RESERVE<br/>EDITION.</h2>
                <div className="mt-8">
                   <Link href="/contact" className="btn pointer-events-auto">Secure Timepiece</Link>
+               </div>
+            </div>
+          </div>
+
+          <div className="side-column right-align desktop-only">
+            <div id="block-1-right" className="content-panel opacity-0">
+               <h1 className="title-serif text-white/30">244</h1>
+               <p className="caption-text">LIMITED EDITION PIECES</p>
+            </div>
+            <div id="block-4-right" className="content-panel opacity-0">
+               <span className="label-text mb-4 block">Technical</span>
+               <div className="spec-rows">
+                  <div className="spec-item"><span className="spec-label">Case</span><span className="spec-value">38mm Titanium</span></div>
+                  <div className="spec-item"><span className="spec-label">Power</span><span className="spec-value">42hr Reserve</span></div>
+                  <div className="spec-item"><span className="spec-label">Crystal</span><span className="spec-value">Sapphire AR</span></div>
                </div>
             </div>
           </div>
@@ -254,18 +275,114 @@ export default function AnimationSection() {
       </div>
 
       <style jsx>{`
+        /* MOBILE BASE STYLES */
+        .watch-chamber {
+          position: relative;
+          height: 40vh;
+          margin-top: 10vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10;
+        }
         .watch-canvas { width: 100%; height: 100%; object-fit: contain; background: transparent; }
-        .content-panel { position: absolute; width: 100%; transition: all 1s ease; }
-        .title-serif { font-size: 5rem; line-height: 0.9; margin-bottom: 1rem; color: white; white-space: nowrap; }
-        .subtitle-serif { font-size: 3.5rem; line-height: 1; margin-bottom: 1.5rem; color: white; white-space: nowrap; }
-        .label-text { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.4em; color: #c8622a; }
-        .caption-text { font-size: 0.7rem; letter-spacing: 0.5em; color: #c8622a; text-transform: uppercase; }
-        .description-text { font-size: 1.1rem; color: #8a8070; line-height: 1.6; font-weight: 300; }
-        .spec-rows { display: flex; flex-direction: column; gap: 1.5rem; }
+        .panels-container {
+          position: relative;
+          height: 50vh;
+          z-index: 20;
+          display: flex;
+          flex-direction: column;
+          padding: 0 6vw;
+          pointer-events: none;
+        }
+        .side-column {
+          position: relative;
+          height: 100%;
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          justify-content: flex-start;
+        }
+        .content-panel { 
+          position: absolute; 
+          width: 100%; 
+          left: 0;
+          top: 1rem;
+          transition: all 1s ease; 
+        }
+        
+        .title-serif { font-size: 2.2rem; line-height: 0.9; margin-bottom: 0.5rem; color: white; white-space: normal; letter-spacing: 0.2em; text-indent: 0.2em; }
+        .subtitle-serif { font-size: 1.8rem; line-height: 1; margin-bottom: 1rem; color: white; white-space: normal; letter-spacing: 0.1em; text-indent: 0.1em; }
+        .label-text { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.4em; color: #c8622a; }
+        .caption-text { font-size: 0.6rem; letter-spacing: 0.4em; color: #c8622a; text-transform: uppercase; }
+        .description-text { font-size: 0.95rem; color: #8a8070; line-height: 1.5; font-weight: 300; padding: 0 2vw; }
+        .spec-rows { display: flex; flex-direction: column; gap: 1rem; align-items: center; }
         .spec-item { display: flex; flex-direction: column; gap: 0.2rem; }
         .spec-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.2em; color: #c8622a; }
-        .spec-value { font-size: 1.2rem; color: white; font-family: var(--font-serif); text-transform: uppercase; letter-spacing: 0.1em; }
-        @media (max-width: 1400px) { .title-serif { font-size: 3.5rem; } .subtitle-serif { font-size: 2.5rem; } }
+        .spec-value { font-size: 1rem; color: white; font-family: var(--font-serif); text-transform: uppercase; letter-spacing: 0.1em; }
+        
+        .mobile-only { display: block; }
+        .desktop-only { display: none !important; }
+
+        /* DESKTOP MEDIA QUERY (STRICT OVERRIDES) */
+        @media (min-width: 768px) {
+          .desktop-only { display: block !important; }
+          .mobile-only { display: none !important; }
+
+          .watch-chamber {
+            position: absolute !important;
+            inset: 0 !important;
+            height: 100% !important;
+            margin-top: 0 !important;
+          }
+          
+          .panels-container {
+            position: absolute !important;
+            inset: 0 !important;
+            height: 100% !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            padding: 0 6vw !important;
+          }
+          
+          .side-column {
+            position: relative !important;
+            width: 400px !important;
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: flex-start !important;
+            text-align: left !important;
+          }
+          
+          .left-align { align-items: flex-start !important; text-align: left !important; }
+          .right-align { align-items: flex-end !important; text-align: right !important; }
+          
+          .content-panel { 
+            position: absolute !important; 
+            width: 100% !important; 
+            top: auto !important; 
+            left: auto !important;
+          }
+          
+          .title-serif { font-size: 5rem !important; white-space: nowrap !important; letter-spacing: 0.5em !important; text-indent: 0 !important; margin-bottom: 1rem !important; }
+          .subtitle-serif { font-size: 3.5rem !important; white-space: nowrap !important; letter-spacing: 0.3em !important; text-indent: 0 !important; margin-bottom: 1.5rem !important; }
+          .label-text { font-size: 0.65rem !important; }
+          .caption-text { font-size: 0.7rem !important; letter-spacing: 0.5em !important; }
+          .description-text { font-size: 1.1rem !important; line-height: 1.6 !important; padding: 0 !important; }
+          .spec-rows { gap: 1.5rem !important; align-items: flex-end !important; }
+          .spec-value { font-size: 1.2rem !important; }
+        }
+
+        @media (max-width: 380px) {
+          .panels-container { padding: 0 4vw; }
+          .title-serif { font-size: 1.8rem; letter-spacing: 0.1em; text-indent: 0.1em; }
+          .subtitle-serif { font-size: 1.4rem; letter-spacing: 0.05em; text-indent: 0.05em; }
+          .description-text { font-size: 0.8rem; }
+        }
       `}</style>
     </section>
   );

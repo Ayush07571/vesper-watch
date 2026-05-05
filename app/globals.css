@@ -36,6 +36,13 @@ h1, h2, h3, .serif {
   font-weight: 400;
 }
 
+@media (max-width: 768px) {
+  h1, h2, h3, .serif {
+    letter-spacing: 0.3em;
+    text-indent: 0.3em;
+  }
+}
+
 .label-text {
   font-size: 0.7rem;
   letter-spacing: 0.6em;
@@ -79,8 +86,17 @@ h1, h2, h3, .serif {
   text-transform: uppercase;
   letter-spacing: 0.4em;
   font-size: 0.8rem;
+  white-space: nowrap;
   cursor: pointer;
   transition: var(--transition-smooth);
+}
+
+@media (max-width: 768px) {
+  .btn {
+    padding: 1rem 2rem;
+    letter-spacing: 0.2em;
+    font-size: 0.7rem;
+  }
 }
 
 .btn:hover {
