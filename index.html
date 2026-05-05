@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VESPER EQUINOX | The Art of Mechanical Deconstruction</title>
+    <meta name="description" content="Explore the intricate beauty of the Vesper Equinox. A symphony of 244 individual components, synchronized in perfect harmony.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tenor+Sans&family=Outfit:wght@200;300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --accent-color: #d47a3c;
+            --text-color: #f0ece4;
+            --text-muted: #a0a0a0;
+            --transition-smooth: all 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Outfit', sans-serif;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        h1, h2, h3, .serif {
+            font-family: 'Tenor Sans', serif;
+            text-transform: uppercase;
+            letter-spacing: 0.5em;
+            font-weight: 400;
+        }
+
+        .label {
+            font-size: 0.7rem;
+            letter-spacing: 0.6em;
+            text-transform: uppercase;
+            color: var(--accent-color);
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        /* Loading Screen */
+        #loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 1s ease-out;
+        }
+
+        .loader-brand {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            opacity: 0.8;
+        }
+
+        .progress-container {
+            width: 200px;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 0%;
+            background: var(--accent-color);
+            transition: width 0.1s linear;
+        }
+
+        /* Navbar */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 2rem 4rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            mix-blend-mode: difference;
+        }
+
+        .logo {
+            font-size: 1.2rem;
+            font-family: 'Tenor Sans', serif;
+            letter-spacing: 0.4em;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 3rem;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3em;
+            opacity: 0.7;
+            transition: var(--transition-smooth);
+        }
+
+        .nav-links a:hover {
+            opacity: 1;
+        }
+
+        /* Animation Section */
+        #animation-section {
+            height: 500vh;
+            position: relative;
+        }
+
+        .sticky-wrapper {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Text Overlays */
+        .overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            width: 100%;
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        .overlay-headline h1 {
+            font-size: clamp(2rem, 6vw, 4rem);
+            margin-bottom: 1rem;
+        }
+
+        .overlay-tagline p {
+            font-size: 1.2rem;
+            letter-spacing: 0.2em;
+            max-width: 600px;
+            margin: 0 auto;
+            font-weight: 200;
+        }
+
+        .detail-labels {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        .detail-label {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            opacity: 0;
+        }
+
+        .detail-label.left { left: 10%; text-align: left; }
+        .detail-label.right { right: 10%; text-align: right; }
+
+        .detail-label .title {
+            font-family: 'Tenor Sans', serif;
+            font-size: 0.8rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--accent-color);
+        }
+
+        .detail-label .desc {
+            font-size: 0.7rem;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            max-width: 200px;
+        }
+
+        .cta-overlay {
+            position: absolute;
+            bottom: 15%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--accent-color);
+            color: white;
+            padding: 1.2rem 3rem;
+            text-transform: uppercase;
+            letter-spacing: 0.4em;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            pointer-events: all;
+        }
+
+        .btn:hover {
+            background: var(--accent-color);
+            color: var(--bg-color);
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 5vh;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            opacity: 1;
+            transition: opacity 0.5s ease;
+        }
+
+        .scroll-indicator .line {
+            width: 1px;
+            height: 60px;
+            background: linear-gradient(to bottom, var(--accent-color), transparent);
+        }
+
+        /* Cinematic Effects */
+        .vignette {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.8) 100%);
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .grain {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 60;
+            opacity: 0.035;
+        }
+
+        /* Content Sections */
+        section {
+            padding: 10rem 10%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(50px);
+            transition: opacity 1.2s ease, transform 1.2s ease;
+        }
+
+        section.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .divider {
+            width: 1px;
+            height: 100px;
+            background: var(--accent-color);
+            margin: 0 auto;
+            opacity: 0.3;
+        }
+
+        .story-section h2 {
+            font-size: 2.5rem;
+            margin-bottom: 3rem;
+            max-width: 800px;
+        }
+
+        .story-section p {
+            max-width: 600px;
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .specs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 4rem;
+            width: 100%;
+            margin-top: 6rem;
+        }
+
+        .spec-item {
+            text-align: left;
+            border-left: 1px solid rgba(212, 122, 60, 0.2);
+            padding-left: 2rem;
+        }
+
+        .spec-item h3 {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            letter-spacing: 0.2em;
+        }
+
+        .spec-item p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .quote-section blockquote {
+            font-family: 'Tenor Sans', serif;
+            font-size: 2rem;
+            line-height: 1.4;
+            max-width: 900px;
+            font-style: italic;
+        }
+
+        .quote-section cite {
+            display: block;
+            margin-top: 2rem;
+            font-size: 0.8rem;
+            letter-spacing: 0.5em;
+            text-transform: uppercase;
+            color: var(--accent-color);
+        }
+
+        footer {
+            padding: 4rem;
+            text-align: center;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.6rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 768px) {
+            nav { padding: 1.5rem 2rem; }
+            .nav-links { display: none; }
+            .detail-labels { display: none; }
+            section { padding: 6rem 5%; }
+            .specs-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Cinematic Overlays -->
+    <div class="vignette"></div>
+    <div class="grain">
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <filter id="noiseFilter">
+                <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/>
+            </filter>
+            <rect width="100%" height="100%" filter="url(#noiseFilter)"/>
+        </svg>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loader">
+        <div class="loader-brand serif">VESPER</div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="logo">VESPER</div>
+        <div class="nav-links">
+            <a href="#heritage">Heritage</a>
+            <a href="#specs">Specifications</a>
+            <a href="#craft">Craft</a>
+        </div>
+        <div class="nav-cta">
+            <a href="#" class="btn" style="padding: 0.8rem 2rem; font-size: 0.6rem;">Acquire</a>
+        </div>
+    </nav>
+
+    <!-- Animation Section -->
+    <div id="animation-section">
+        <div class="sticky-wrapper">
+            <canvas id="watch-canvas"></canvas>
+
+            <!-- Scroll Indicator -->
+            <div class="scroll-indicator" id="scroll-indicator">
+                <span class="label">Explore</span>
+                <div class="line"></div>
+            </div>
+
+            <!-- Overlays -->
+            <div class="overlay overlay-headline" id="overlay-1">
+                <span class="label">Presenting</span>
+                <h1>THE EQUINOX</h1>
+            </div>
+
+            <div class="overlay overlay-tagline" id="overlay-2">
+                <p>The architecture of time, revealed in its purest form.</p>
+            </div>
+
+            <div class="detail-labels">
+                <!-- Left Side Labels -->
+                <div class="detail-label left" id="label-1" style="top: 30%">
+                    <span class="title">Sapphire</span>
+                    <span class="desc">Double-domed sapphire crystal with multi-layer anti-reflective coating.</span>
+                </div>
+                <div class="detail-label left" id="label-2" style="top: 50%">
+                    <span class="title">Sunburst Dial</span>
+                    <span class="desc">Charcoal sunburst finish with hand-applied faceted indices.</span>
+                </div>
+                <div class="detail-label left" id="label-3" style="top: 70%">
+                    <span class="title">Titanium Case</span>
+                    <span class="desc">Grade 5 titanium ring with brushed and polished bevels.</span>
+                </div>
+
+                <!-- Right Side Labels -->
+                <div class="detail-label right" id="label-4" style="top: 35%">
+                    <span class="title">Caliber V.01</span>
+                    <span class="desc">Skeleton-cut movement bridge with hand-chamfered edges.</span>
+                </div>
+                <div class="detail-label right" id="label-5" style="top: 55%">
+                    <span class="title">Escapement</span>
+                    <span class="desc">Swiss lever escapement with a glucydur balance wheel.</span>
+                </div>
+                <div class="detail-label right" id="label-6" style="top: 75%">
+                    <span class="title">Exhibition Back</span>
+                    <span class="desc">Titanium case back with a sapphire display window.</span>
+                </div>
+            </div>
+
+            <div class="cta-overlay" id="overlay-cta">
+                <button class="btn">Configure Your Edition</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Sections -->
+    <div class="divider"></div>
+    <section id="heritage" class="story-section">
+        <span class="label">Heritage</span>
+        <h2>A Legacy Reimagined for the Modern Horologist.</h2>
+        <p>Born from a obsession with transparency and mechanical purity, the Equinox represents the pinnacle of our design philosophy. Each of the 244 components is finished by hand in our workshop, ensuring that what is visible is as beautiful as what is hidden.</p>
+    </section>
+
+    <div class="divider"></div>
+    <section id="specs" class="specs-section">
+        <span class="label">Technical Excellence</span>
+        <h2>Precision in Every Micron.</h2>
+        <div class="specs-grid">
+            <div class="spec-item">
+                <h3>The Case</h3>
+                <p>38mm round profile, crafted from Grade 5 titanium. Only 10mm thin with an integrated lug design that flows seamlessly into the wrist.</p>
+            </div>
+            <div class="spec-item">
+                <h3>The Movement</h3>
+                <p>In-house Caliber V.01 skeletonized manual-wind movement. 42-hour power reserve, 28,800 vph, and 21 jewels.</p>
+            </div>
+            <div class="spec-item">
+                <h3>The Details</h3>
+                <p>Slender orange seconds hand with a lume pip at its tip. Espresso leather strap with a custom titanium deployant clasp.</p>
+            </div>
+        </div>
+    </section>
+
+    <div class="divider"></div>
+    <section class="quote-section">
+        <blockquote>"The watch is not just a tool for time; it is a mechanical sculpture that breathes on the wrist."</blockquote>
+        <cite>— Marcus Vesper, Founder</cite>
+    </section>
+
+    <div class="divider"></div>
+    <section class="final-cta">
+        <span class="label">Join the Waitlist</span>
+        <h2>Limited to 244 Pieces Worldwide.</h2>
+        <p style="margin-bottom: 3rem; color: var(--text-muted);">The first edition is now open for reservations.</p>
+        <button class="btn">Reserve Your Timepiece</button>
+    </section>
+
+    <footer>
+        &copy; 2026 VESPER HOROLOGY. ALL RIGHTS RESERVED.
+    </footer>
+
+    <script>
+        // Configuration
+        const frameCount = 244;
+        const currentFrame = index => `images/ezgif-frame-${index.toString().padStart(3, '0')}.png`;
+        const images = [];
+        const canvas = document.getElementById('watch-canvas');
+        const context = canvas.getContext('2d');
+        const progressBar = document.getElementById('progress-bar');
+        const loader = document.getElementById('loader');
+
+        // Preload Images
+        let loadedCount = 0;
+        const preloadImages = () => {
+            return new Promise((resolve) => {
+                for (let i = 1; i <= frameCount; i++) {
+                    const img = new Image();
+                    img.src = currentFrame(i);
+                    img.onload = () => {
+                        loadedCount++;
+                        const progress = (loadedCount / frameCount) * 100;
+                        progressBar.style.width = `${progress}%`;
+                        if (loadedCount === frameCount) {
+                            setTimeout(() => {
+                                loader.style.opacity = '0';
+                                setTimeout(() => loader.style.display = 'none', 1000);
+                                resolve();
+                            }, 500);
+                        }
+                    };
+                    images.push(img);
+                }
+            });
+        };
+
+        // Canvas Rendering Logic
+        const render = (index) => {
+            // Reverse logic: scroll 0% = frame 244, scroll 100% = frame 1
+            const frameIndex = Math.max(1, Math.min(frameCount, frameCount - Math.floor(index)));
+            const img = images[frameIndex - 1];
+            
+            if (!img) return;
+
+            // Clear and Draw
+            context.fillStyle = '#0a0a0a';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Cover Scaling
+            const imgRatio = img.width / img.height;
+            const canvasRatio = canvas.width / canvas.height;
+            let drawWidth, drawHeight, offsetX, offsetY;
+
+            if (canvasRatio > imgRatio) {
+                drawWidth = canvas.width;
+                drawHeight = canvas.width / imgRatio;
+                offsetX = 0;
+                offsetY = (canvas.height - drawHeight) / 2;
+            } else {
+                drawWidth = canvas.height * imgRatio;
+                drawHeight = canvas.height;
+                offsetX = (canvas.width - drawWidth) / 2;
+                offsetY = 0;
+            }
+
+            context.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+        };
+
+        // Resize Handler
+        const resize = () => {
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+            context.scale(dpr, dpr);
+            
+            // Redraw current frame
+            const scrollFraction = window.scrollY / (document.getElementById('animation-section').offsetHeight - window.innerHeight);
+            const frameIndex = scrollFraction * (frameCount - 1);
+            render(frameIndex);
+        };
+
+        // Scroll and Animation Loop
+        let lastFrame = -1;
+        const update = () => {
+            const section = document.getElementById('animation-section');
+            const scrollFraction = window.scrollY / (section.offsetHeight - window.innerHeight);
+            
+            // Frame Rendering
+            const frameIndex = scrollFraction * (frameCount - 1);
+            if (Math.floor(frameIndex) !== lastFrame) {
+                render(frameIndex);
+                lastFrame = Math.floor(frameIndex);
+            }
+
+            // Overlay Transitions
+            updateOverlays(scrollFraction);
+
+            requestAnimationFrame(update);
+        };
+
+        const updateOverlays = (progress) => {
+            const overlays = [
+                { id: 'overlay-1', start: 0, end: 0.15 },
+                { id: 'overlay-2', start: 0.20, end: 0.40 },
+                { id: 'label-1', start: 0.65, end: 0.85 },
+                { id: 'label-2', start: 0.68, end: 0.88 },
+                { id: 'label-3', start: 0.71, end: 0.91 },
+                { id: 'label-4', start: 0.65, end: 0.85 },
+                { id: 'label-5', start: 0.68, end: 0.88 },
+                { id: 'label-6', start: 0.71, end: 0.91 },
+                { id: 'overlay-cta', start: 0.90, end: 1.0 }
+            ];
+
+            overlays.forEach(o => {
+                const el = document.getElementById(o.id);
+                if (!el) return;
+
+                let opacity = 0;
+                const fadeInDist = 0.05;
+                const fadeOutDist = 0.05;
+
+                if (progress >= o.start && progress <= o.end) {
+                    if (progress < o.start + fadeInDist) {
+                        opacity = (progress - o.start) / fadeInDist;
+                    } else if (progress > o.end - fadeOutDist) {
+                        opacity = (o.end - progress) / fadeOutDist;
+                    } else {
+                        opacity = 1;
+                    }
+                }
+                
+                el.style.opacity = opacity;
+                el.style.transform = `translate(${o.id.includes('label') ? '0' : '-50%'}, ${o.id.includes('cta') ? '0' : '-50%'}) translateY(${(1 - opacity) * 20}px)`;
+            });
+
+            // Scroll indicator fade out
+            const indicator = document.getElementById('scroll-indicator');
+            indicator.style.opacity = progress > 0.03 ? 0 : 1;
+        };
+
+        // Intersection Observer for Content Sections
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('section').forEach(section => observer.observe(section));
+
+        // Initialization
+        window.addEventListener('resize', resize);
+        
+        preloadImages().then(() => {
+            resize();
+            update();
+        });
+    </script>
+</body>
+</html>
