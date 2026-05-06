@@ -24,6 +24,9 @@ export default function AnimationSection() {
   const imagesRef = useRef<(ImageBitmap | null)[]>(new Array(frameCount).fill(null));
   const lastFrameRef = useRef<number>(-1);
   const rafIdRef = useRef<number>();
+  const currentProgressRef = useRef<number>(0);
+  const targetProgressRef = useRef<number>(0);
+  const progressBarRef = useRef<HTMLDivElement>(null);
   
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
@@ -133,10 +136,21 @@ export default function AnimationSection() {
 
     const imageData = offCtx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-      if (avg < 42) data[i + 3] = 0;
+    const data32 = new Uint32Array(data.buffer);
+    
+    // High-speed 32-bit pixel processing
+    for (let i = 0; i < data32.length; i++) {
+      const pixel = data32[i];
+      // Extract RGB from 32-bit (Assuming little-endian ABGR)
+      const r = pixel & 0xFF;
+      const g = (pixel >> 8) & 0xFF;
+      const b = (pixel >> 16) & 0xFF;
+      const avg = (r + g + b) / 3;
+      if (avg < 42) {
+        data32[i] = 0; // Set entire pixel to transparent black
+      }
     }
+    
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.putImageData(imageData, 0, 0);
   };
@@ -167,8 +181,25 @@ export default function AnimationSection() {
       const section = containerRef.current;
       if (!section) return;
       const scrollFraction = window.scrollY / (section.offsetHeight - window.innerHeight);
-      const clampedProgress = Math.max(0, Math.min(1, scrollFraction));
-      setScrollProgress(clampedProgress);
+      const target = Math.max(0, Math.min(1, scrollFraction));
+      targetProgressRef.current = target;
+
+      // Silky Smooth Lerp (Linear Interpolation)
+      const lerpFactor = 0.08; 
+      currentProgressRef.current += (targetProgressRef.current - currentProgressRef.current) * lerpFactor;
+      
+      // Snap to target if very close
+      if (Math.abs(targetProgressRef.current - currentProgressRef.current) < 0.0001) {
+        currentProgressRef.current = targetProgressRef.current;
+      }
+
+      const clampedProgress = currentProgressRef.current;
+      
+      // Direct DOM manipulation for progress bar (Bypasses React lag)
+      if (progressBarRef.current) {
+        progressBarRef.current.style.width = `${clampedProgress * 100}%`;
+      }
+
       const frameIndex = getFrameIndex(clampedProgress);
       if (Math.floor(frameIndex) !== lastFrameRef.current) {
         renderFrame(frameIndex);
@@ -285,7 +316,7 @@ export default function AnimationSection() {
         </div>
         
         <div className="absolute top-0 left-0 w-full h-[1px] bg-white/5 z-[1000]">
-          <div className="h-full bg-[#c8622a] transition-all duration-300" style={{ width: `${scrollProgress * 100}%` }} />
+          <div ref={progressBarRef} className="h-full bg-[#c8622a]" style={{ width: '0%' }} />
         </div>
       </div>
 
