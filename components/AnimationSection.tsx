@@ -9,10 +9,10 @@ const PRIORITY_LIMIT = 120;
 const currentFrame = (index: number) => `/images/ezgif-frame-${Math.max(1, Math.min(frameCount, Math.floor(index))).toString().padStart(3, '0')}.webp`;
 
 const contentBlocks = [
-  { id: 'block-1', start: 0,    end: 0.15 },
-  { id: 'block-2', start: 0.18, end: 0.38 },
-  { id: 'block-3', start: 0.42, end: 0.62 },
-  { id: 'block-4', start: 0.65, end: 0.85 },
+  { id: 'block-1', start: 0.00, end: 0.22 },
+  { id: 'block-2', start: 0.25, end: 0.47 },
+  { id: 'block-3', start: 0.55, end: 0.70 },
+  { id: 'block-4', start: 0.72, end: 0.85 },
   { id: 'block-5', start: 0.88, end: 1.00 },
 ];
 
@@ -203,7 +203,7 @@ export default function AnimationSection() {
       
       if (isAutoPlaying && canStartAutoRef.current) {
         // Slow, elegant auto-drift
-        autoProgressRef.current += 0.0006; 
+        autoProgressRef.current += 0.0010; 
         if (autoProgressRef.current >= 1) {
           autoProgressRef.current = 1;
           setIsAutoPlaying(false);
@@ -222,7 +222,7 @@ export default function AnimationSection() {
       }
 
       // Smooth Lerp for the movement (Increased responsiveness for manual control)
-      const lerpFactor = isAutoPlaying ? 0.08 : 0.15; 
+      const lerpFactor = isAutoPlaying ? 0.1 : 0.22; 
       currentProgressRef.current += (targetProgress - currentProgressRef.current) * lerpFactor;
       
       const visualProgress = currentProgressRef.current;
@@ -247,7 +247,11 @@ export default function AnimationSection() {
         if (el) {
           if (visualProgress >= block.start && visualProgress <= block.end) {
             const bp = (visualProgress - block.start) / (block.end - block.start);
-            let opacity = Math.sin(bp * Math.PI);
+            // High-efficiency linear plateau (10% fade in, 80% stable, 10% fade out)
+            let opacity = 0;
+            if (bp < 0.1) opacity = bp / 0.1;
+            else if (bp > 0.9) opacity = (1 - bp) / 0.1;
+            else opacity = 1;
             if (block.id === 'block-5' && visualProgress >= 0.95) opacity = 1;
             el.style.opacity = opacity.toString();
             el.style.visibility = 'visible';
@@ -407,7 +411,7 @@ export default function AnimationSection() {
           width: 100%; 
           left: 0;
           top: 1rem;
-          transition: all 1s ease; 
+          transition: opacity 0s, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1); 
         }
         
         .title-serif { font-size: 2.2rem; line-height: 0.9; margin-bottom: 0.5rem; color: white; white-space: normal; letter-spacing: 0.2em; text-indent: 0.2em; }
