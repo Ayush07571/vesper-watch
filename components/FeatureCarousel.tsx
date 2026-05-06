@@ -8,19 +8,19 @@ const features = [
     title: "The Caliber V.01",
     subtitle: "Mechanical Purity",
     description: "A skeletonized masterpiece where every bridge and gear is visible. Finished by hand with anglage and perlage techniques usually reserved for high horology.",
-    image: "/images/caliber-detail.png"
+    image: "/images/caliber-detail.webp"
   },
   {
     title: "Grade 5 Titanium",
     subtitle: "Aerospace Precision",
     description: "The Equinox case is forged from Grade 5 Titanium—a material stronger than steel but 40% lighter, ensuring comfort without compromising on durability.",
-    image: "/images/titanium-detail.png"
+    image: "/images/titanium-detail.webp"
   },
   {
     title: "244 Components",
     subtitle: "Complex Harmony",
     description: "Hundreds of individual parts working in perfect synchronization. A vertical clutch and column wheel mechanism ensure a tactile, high-precision experience.",
-    image: "/images/components-detail.png"
+    image: "/images/components-detail.webp"
   }
 ];
 
@@ -28,12 +28,12 @@ export default function FeatureCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
 
   return (
-    <section className="py-24 bg-[#080705] overflow-hidden" id="excellence">
+    <section className="py-32 bg-[#080705] overflow-hidden" id="excellence">
       <div className="container mx-auto px-6">
-        <div className="flex flex-col lg:flex-row items-center gap-16">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-24">
           
           {/* Text Content */}
-          <div className="w-full lg:w-1/2 space-y-8">
+          <div className="w-full lg:w-5/12 space-y-12">
             <div className="space-y-2">
               <span className="text-[#c8622a] uppercase tracking-[0.4em] text-xs font-semibold">Technical Excellence</span>
               <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif text-white tracking-wider leading-tight">
@@ -68,9 +68,9 @@ export default function FeatureCarousel() {
             </div>
           </div>
 
-          {/* Image Display */}
-          <div className="w-full lg:w-1/2 relative aspect-square group">
-            <div className="absolute inset-0 bg-gradient-to-tr from-[#c8622a]/10 to-transparent rounded-2xl z-0" />
+          {/* Image Display - More compact and elegant */}
+          <div className="w-full lg:w-5/12 relative aspect-[4/5] group max-w-lg mx-auto">
+            <div className="absolute inset-0 bg-gradient-to-tr from-[#c8622a]/5 to-transparent rounded-2xl z-0" />
             
             {features.map((feature, idx) => (
               <div 
