@@ -30,7 +30,11 @@ export default function AnimationSection() {
   
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
-  const [scrollProgress, setScrollProgress] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [showReplay, setShowReplay] = useState(false);
+  const canStartAutoRef = useRef(false);
+  const autoProgressRef = useRef(0);
+  const lastScrollYRef = useRef(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -175,46 +179,76 @@ export default function AnimationSection() {
 
   useEffect(() => {
     if (loading) return;
+    
+    // 1.5s Delay before starting the "show" so the user doesn't miss the first text
+    const timer = setTimeout(() => {
+      canStartAutoRef.current = true;
+    }, 400);
+
     window.addEventListener('resize', resize);
     resize();
     const update = () => {
       const section = containerRef.current;
       if (!section) return;
+
       const scrollFraction = window.scrollY / (section.offsetHeight - window.innerHeight);
-      const target = Math.max(0, Math.min(1, scrollFraction));
-      targetProgressRef.current = target;
-
-      // Silky Smooth Lerp (Linear Interpolation)
-      const lerpFactor = 0.08; 
-      currentProgressRef.current += (targetProgressRef.current - currentProgressRef.current) * lerpFactor;
       
-      // Snap to target if very close
-      if (Math.abs(targetProgressRef.current - currentProgressRef.current) < 0.0001) {
-        currentProgressRef.current = targetProgressRef.current;
+      // Detect user interaction to disable auto-play
+      if (isAutoPlaying && Math.abs(window.scrollY - lastScrollYRef.current) > 2) {
+        setIsAutoPlaying(false);
+      }
+      lastScrollYRef.current = window.scrollY;
+
+      let targetProgress;
+      
+      if (isAutoPlaying && canStartAutoRef.current) {
+        // Slow, elegant auto-drift
+        autoProgressRef.current += 0.0006; 
+        if (autoProgressRef.current >= 1) {
+          autoProgressRef.current = 1;
+          setIsAutoPlaying(false);
+          setShowReplay(true);
+        }
+        targetProgress = autoProgressRef.current;
+      } else if (isAutoPlaying && !canStartAutoRef.current) {
+        // Wait at the start
+        targetProgress = 0;
+      } else {
+        // Manual scroll control
+        targetProgress = Math.max(0, Math.min(1, scrollFraction));
+        if (scrollFraction > 0.99 && !showReplay) {
+          setShowReplay(true);
+        }
       }
 
-      const clampedProgress = currentProgressRef.current;
+      // Smooth Lerp for the movement (Increased responsiveness for manual control)
+      const lerpFactor = isAutoPlaying ? 0.08 : 0.15; 
+      currentProgressRef.current += (targetProgress - currentProgressRef.current) * lerpFactor;
       
-      // Direct DOM manipulation for progress bar (Bypasses React lag)
+      const visualProgress = currentProgressRef.current;
+
+      // Progress bar sync
       if (progressBarRef.current) {
-        progressBarRef.current.style.width = `${clampedProgress * 100}%`;
+        progressBarRef.current.style.width = `${visualProgress * 100}%`;
       }
 
-      const frameIndex = getFrameIndex(clampedProgress);
+      const frameIndex = getFrameIndex(visualProgress);
       if (Math.floor(frameIndex) !== lastFrameRef.current) {
         renderFrame(frameIndex);
         lastFrameRef.current = Math.floor(frameIndex);
       }
+
+      // Narrative synchronization
       contentBlocks.forEach(block => {
         const el = document.getElementById(block.id);
         const rel = document.getElementById(`${block.id}-right`);
         const isMobile = window.innerWidth < 768;
 
         if (el) {
-          if (clampedProgress >= block.start && clampedProgress <= block.end) {
-            const bp = (clampedProgress - block.start) / (block.end - block.start);
+          if (visualProgress >= block.start && visualProgress <= block.end) {
+            const bp = (visualProgress - block.start) / (block.end - block.start);
             let opacity = Math.sin(bp * Math.PI);
-            if (block.id === 'block-5' && clampedProgress >= 0.95) opacity = 1;
+            if (block.id === 'block-5' && visualProgress >= 0.95) opacity = 1;
             el.style.opacity = opacity.toString();
             el.style.visibility = 'visible';
             el.style.transform = `translateY(${(1-opacity)*25}px)`;
@@ -223,12 +257,9 @@ export default function AnimationSection() {
               rel.style.opacity = opacity.toString(); 
               rel.style.visibility = 'visible'; 
               rel.style.transform = `translateY(${(1-opacity)*25}px)`; 
-            } else if (rel) {
-              rel.style.opacity = '0';
-              rel.style.visibility = 'hidden';
             }
           } else {
-            if (block.id === 'block-5' && clampedProgress > 0.99) {
+            if (block.id === 'block-5' && visualProgress > 0.99) {
                el.style.opacity = '1'; el.style.visibility = 'visible'; el.style.transform = `translateY(0px)`;
                if (rel && !isMobile) { rel.style.opacity = '1'; rel.style.visibility = 'visible'; rel.style.transform = `translateY(0px)`; }
             } else {
@@ -242,16 +273,36 @@ export default function AnimationSection() {
     };
     rafIdRef.current = requestAnimationFrame(update);
     return () => {
+      clearTimeout(timer);
       window.removeEventListener('resize', resize);
       if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
     };
   }, [loading]);
 
   return (
-    <section ref={containerRef} className="relative h-[600vh] bg-[#080705]">
+    <section ref={containerRef} className="relative h-[300vh] bg-[#080705]">
       <Loader progress={progress} isVisible={loading} />
       
       <div ref={stickyRef} className="sticky top-0 h-screen w-full flex flex-col md:block overflow-hidden">
+        
+        {/* Replay Button */}
+        {showReplay && (
+          <button 
+            onClick={() => {
+              setIsAutoPlaying(true);
+              setShowReplay(false);
+              autoProgressRef.current = 0;
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="absolute bottom-12 right-12 z-[2000] flex items-center gap-3 group bg-white/5 hover:bg-[#c8622a]/20 backdrop-blur-md border border-white/10 px-6 py-3 rounded-full transition-all duration-500 animate-in fade-in slide-in-from-bottom-4"
+          >
+            <span className="text-[0.6rem] uppercase tracking-[0.3em] text-white/70 group-hover:text-white transition-colors">Replay Experience</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#c8622a] group-hover:rotate-180 transition-transform duration-700">
+              <path d="M23 4v6h-6M1 20v-6h6" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+          </button>
+        )}
         
         {/* Watch Container */}
         <div ref={watchContainerRef} className="watch-chamber">

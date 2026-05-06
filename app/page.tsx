@@ -6,6 +6,7 @@ import SpecsSection from '@/components/SpecsSection';
 import QuoteSection from '@/components/QuoteSection';
 import FinalCTA from '@/components/FinalCTA';
 import Footer from '@/components/Footer';
+import FeatureCarousel from '@/components/FeatureCarousel';
 
 export default function Home() {
   return (
@@ -13,6 +14,8 @@ export default function Home() {
       <Navbar />
       
       <AnimationSection />
+      
+      <FeatureCarousel />
       
       <div className="relative z-10 bg-[#080705]">
         <div className="divider" />

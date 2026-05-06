@@ -15,10 +15,10 @@ export default function Navbar() {
       </Link>
       
       <div className="nav-links hidden md:flex gap-12">
-        {['Heritage', 'Specifications', 'Craft'].map((link) => (
+        {['Excellence', 'Heritage', 'Specifications', 'Craft'].map((link) => (
           <Link
             key={link}
-            href={`/#${link.toLowerCase()}`}
+            href={link === 'Excellence' ? '/#excellence' : `/#${link.toLowerCase()}`}
             className="text-[0.7rem] text-white uppercase tracking-[0.3em] opacity-70 hover:opacity-100 transition-all duration-500"
           >
             {link}
