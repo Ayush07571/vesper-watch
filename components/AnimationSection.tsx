@@ -6,7 +6,7 @@ import Loader from './Loader';
 
 const frameCount = 244;
 const PRIORITY_LIMIT = 120; 
-const currentFrame = (index: number) => `/images/ezgif-frame-${index.toString().padStart(3, '0')}.webp`;
+const currentFrame = (index: number) => `/images/ezgif-frame-${Math.max(1, Math.min(frameCount, Math.floor(index))).toString().padStart(3, '0')}.webp`;
 
 const contentBlocks = [
   { id: 'block-1', start: 0,    end: 0.15 },
@@ -68,6 +68,20 @@ export default function AnimationSection() {
     preload();
     return () => { isMounted = false; };
   }, []);
+
+  const getFrameIndex = (clampedProgress: number) => {
+    if (clampedProgress < 0.1) {
+      return 1; // Fully Assembled (Frame 1)
+    } else if (clampedProgress < 0.25) {
+      // Quick Explosion effect
+      const p = (clampedProgress - 0.1) / 0.15;
+      return 1 + p * (frameCount - 1);
+    } else {
+      // Slow, sophisticated re-assembly (The "Correct" movement)
+      const p = (clampedProgress - 0.25) / 0.75;
+      return frameCount - (p * (frameCount - 1));
+    }
+  };
 
   const renderFrame = (index: number) => {
     const canvas = canvasRef.current;
@@ -140,7 +154,8 @@ export default function AnimationSection() {
     const section = containerRef.current;
     if (section) {
        const scrollFraction = window.scrollY / (section.offsetHeight - window.innerHeight);
-       renderFrame(Math.max(0, Math.min(1, scrollFraction)) * (frameCount - 1));
+       const clamped = Math.max(0, Math.min(1, scrollFraction));
+       renderFrame(getFrameIndex(clamped));
     }
   };
 
@@ -154,7 +169,7 @@ export default function AnimationSection() {
       const scrollFraction = window.scrollY / (section.offsetHeight - window.innerHeight);
       const clampedProgress = Math.max(0, Math.min(1, scrollFraction));
       setScrollProgress(clampedProgress);
-      const frameIndex = clampedProgress * (frameCount - 1);
+      const frameIndex = getFrameIndex(clampedProgress);
       if (Math.floor(frameIndex) !== lastFrameRef.current) {
         renderFrame(frameIndex);
         lastFrameRef.current = Math.floor(frameIndex);
